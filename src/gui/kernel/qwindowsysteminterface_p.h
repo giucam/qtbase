@@ -62,6 +62,8 @@
 
 QT_BEGIN_NAMESPACE
 
+class QAbstractWindowSystemEventFilter;
+
 class Q_GUI_EXPORT QWindowSystemInterfacePrivate {
 public:
     enum EventType {
@@ -483,6 +485,18 @@ public:
     static QMutex flushEventMutex;
 
     static QList<QTouchEvent::TouchPoint> convertTouchPoints(const QList<QWindowSystemInterface::TouchPoint> &points, QEvent::Type *type);
+
+    static void installWindowSystemEventFilter(QAbstractWindowSystemEventFilter *filter);
+    static void removeWindowSystemEventFilter(QAbstractWindowSystemEventFilter *filter);
+    static QList<QAbstractWindowSystemEventFilter *> filters;
+};
+
+class Q_GUI_EXPORT QAbstractWindowSystemEventFilter
+{
+public:
+    virtual ~QAbstractWindowSystemEventFilter();
+    virtual bool eventFilter(QWindowSystemInterfacePrivate::WindowSystemEvent *event) = 0;
+    virtual void eventSent(QWindowSystemInterfacePrivate::WindowSystemEvent *event) = 0;
 };
 
 QT_END_NAMESPACE

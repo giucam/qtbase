@@ -56,6 +56,7 @@ QElapsedTimer QWindowSystemInterfacePrivate::eventTime;
 bool QWindowSystemInterfacePrivate::synchronousWindowsSystemEvents = false;
 QWaitCondition QWindowSystemInterfacePrivate::eventsFlushed;
 QMutex QWindowSystemInterfacePrivate::flushEventMutex;
+QList<QAbstractWindowSystemEventFilter *> QWindowSystemInterfacePrivate::filters;
 
 //------------------------------------------------------------
 //
@@ -571,12 +572,38 @@ bool QWindowSystemInterface::sendWindowSystemEvents(QEventLoop::ProcessEventsFla
                 QWindowSystemInterfacePrivate::getWindowSystemEvent();
         if (!event)
             break;
-        nevents++;
-        QGuiApplicationPrivate::processWindowSystemEvent(event);
+
+        bool filtered = false;
+        foreach (QAbstractWindowSystemEventFilter *filter, QWindowSystemInterfacePrivate::filters) {
+            if (filter->eventFilter(event)) {
+                filtered = true;
+                break;
+            }
+        }
+
+        if (!filtered) {
+            nevents++;
+            QGuiApplicationPrivate::processWindowSystemEvent(event);
+            foreach (QAbstractWindowSystemEventFilter *filter, QWindowSystemInterfacePrivate::filters) {
+                filter->eventSent(event);
+            }
+        }
         delete event;
     }
 
     return (nevents > 0);
+}
+
+void QWindowSystemInterfacePrivate::installWindowSystemEventFilter(QAbstractWindowSystemEventFilter *filter)
+{
+    if (!filters.contains(filter)) {
+        filters << filter;
+    }
+}
+
+void QWindowSystemInterfacePrivate::removeWindowSystemEventFilter(QAbstractWindowSystemEventFilter *filter)
+{
+    filters.removeOne(filter);
 }
 
 void QWindowSystemInterface::setSynchronousWindowsSystemEvents(bool enable)
@@ -774,6 +801,11 @@ Q_GUI_EXPORT  void qt_handleTouchEvent(QWindow *w, QTouchDevice *device,
                                 Qt::KeyboardModifiers mods = Qt::NoModifier)
 {
     QWindowSystemInterface::handleTouchEvent(w, device, touchPointList(points), mods);
+}
+
+QAbstractWindowSystemEventFilter::~QAbstractWindowSystemEventFilter()
+{
+    QWindowSystemInterfacePrivate::removeWindowSystemEventFilter(this);
 }
 
 QT_END_NAMESPACE
